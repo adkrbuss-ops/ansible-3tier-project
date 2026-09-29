@@ -1,0 +1,7 @@
+---
+- name: Update apt cache and install base packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    name: [curl, git, unzip, ca-certificates, gnupg, python3-pip]
+    state: present

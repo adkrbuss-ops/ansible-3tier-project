@@ -1,0 +1,17 @@
+---
+- name: Tear everything down
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        filters: { "tag:Project": "{{ project }}" }
+        state: absent
+        wait: true
+    - amazon.aws.ec2_security_group:
+        region: "{{ aws_region }}"
+        name: "{{ item }}"
+        state: absent
+      loop: [threetier-db-sg, threetier-app-sg, threetier-web-sg, threetier-jenkins-sg]

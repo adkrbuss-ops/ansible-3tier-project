@@ -1,0 +1,27 @@
+---
+- name: Create data directory
+  ansible.builtin.file:
+    path: /opt/pgdata
+    state: directory
+    mode: "0700"
+
+- name: Run PostgreSQL container
+  community.docker.docker_container:
+    name: postgres
+    image: postgres:16-alpine
+    state: started
+    restart_policy: unless-stopped
+    env:
+      POSTGRES_DB: "{{ db_name }}"
+      POSTGRES_USER: "{{ db_user }}"
+      POSTGRES_PASSWORD: "{{ db_password }}"
+    ports:
+      - "{{ db_port }}:5432"
+    volumes:
+      - /opt/pgdata:/var/lib/postgresql/data
+  no_log: true
+
+- name: Wait for PostgreSQL port
+  ansible.builtin.wait_for:
+    port: "{{ db_port }}"
+    timeout: 60

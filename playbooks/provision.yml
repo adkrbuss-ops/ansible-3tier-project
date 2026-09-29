@@ -1,0 +1,90 @@
+---
+# Creates security groups + EC2 instances (run from your laptop / Jenkins)
+- name: Provision AWS infrastructure
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Find latest Ubuntu 22.04 AMI
+      amazon.aws.ec2_ami_info:
+        region: "{{ aws_region }}"
+        owners: ["{{ ami_owner }}"]
+        filters:
+          name: "{{ ami_name_filter }}"
+          architecture: x86_64
+      register: amis
+
+    - name: Pick newest AMI
+      ansible.builtin.set_fact:
+        ami_id: "{{ (amis.images | sort(attribute='creation_date') | last).image_id }}"
+
+    - name: Web SG (public HTTP/HTTPS + SSH)
+      amazon.aws.ec2_security_group:
+        region: "{{ aws_region }}"
+        name: threetier-web-sg
+        description: Web tier
+        rules:
+          - { proto: tcp, ports: [80, 443, 22], cidr_ip: 0.0.0.0/0 }
+        tags: { Project: "{{ project }}" }
+
+    - name: App SG (3000 only from web tier)
+      amazon.aws.ec2_security_group:
+        region: "{{ aws_region }}"
+        name: threetier-app-sg
+        description: App tier
+        rules:
+          - { proto: tcp, ports: [3000], group_name: threetier-web-sg }
+          - { proto: tcp, ports: [22], cidr_ip: 0.0.0.0/0 }
+        tags: { Project: "{{ project }}" }
+
+    - name: DB SG (5432 only from app tier)
+      amazon.aws.ec2_security_group:
+        region: "{{ aws_region }}"
+        name: threetier-db-sg
+        description: DB tier
+        rules:
+          - { proto: tcp, ports: [5432], group_name: threetier-app-sg }
+          - { proto: tcp, ports: [22], cidr_ip: 0.0.0.0/0 }
+        tags: { Project: "{{ project }}" }
+
+    - name: Jenkins SG
+      amazon.aws.ec2_security_group:
+        region: "{{ aws_region }}"
+        name: threetier-jenkins-sg
+        description: Jenkins
+        rules:
+          - { proto: tcp, ports: [8080, 22], cidr_ip: 0.0.0.0/0 }
+        tags: { Project: "{{ project }}" }
+
+    - name: Launch EC2 instances
+      amazon.aws.ec2_instance:
+        region: "{{ aws_region }}"
+        name: "{{ item.name }}"
+        key_name: "{{ key_name }}"
+        instance_type: "{{ item.type }}"
+        image_id: "{{ ami_id }}"
+        security_groups: ["{{ item.sg }}"]
+        network:
+          assign_public_ip: true
+        volumes:
+          - device_name: /dev/sda1
+            ebs: { volume_size: 20, volume_type: gp3, delete_on_termination: true }
+        tags:
+          Project: "{{ project }}"
+          Role: "{{ item.role }}"
+        state: running
+        wait: true
+      loop: "{{ instances }}"
+      register: launched
+
+    - name: Wait for SSH
+      ansible.builtin.wait_for:
+        host: "{{ item.instances[0].public_ip_address }}"
+        port: 22
+        timeout: 300
+      loop: "{{ launched.results }}"
+      loop_control: { label: "{{ item.item.name }}" }
+
+    - name: Refresh dynamic inventory
+      ansible.builtin.meta: refresh_inventory

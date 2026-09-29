@@ -1,0 +1,28 @@
+---
+- name: Run backend container
+  community.docker.docker_container:
+    name: backend
+    image: "{{ backend_image }}:{{ image_tag }}"
+    pull: true
+    state: started
+    recreate: true
+    restart_policy: unless-stopped
+    env:
+      DB_HOST: "{{ db_private_ip }}"
+      DB_PORT: "{{ db_port }}"
+      DB_NAME: "{{ db_name }}"
+      DB_USER: "{{ db_user }}"
+      DB_PASSWORD: "{{ db_password }}"
+      PORT: "{{ app_port }}"
+    ports:
+      - "{{ app_port }}:3000"
+  no_log: true
+
+- name: Wait for backend health endpoint
+  ansible.builtin.uri:
+    url: "http://localhost:{{ app_port }}/api/health"
+    status_code: 200
+  register: health
+  retries: 15
+  delay: 4
+  until: health.status == 200

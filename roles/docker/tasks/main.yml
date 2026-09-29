@@ -1,0 +1,24 @@
+---
+- name: Install Docker and Python SDK for Ansible
+  ansible.builtin.apt:
+    name: [docker.io, python3-docker, python3-requests]
+    state: present
+
+- name: Enable and start Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Allow ubuntu user to use Docker
+  ansible.builtin.user:
+    name: ubuntu
+    groups: docker
+    append: true
+
+- name: Login to Docker registry
+  community.docker.docker_login:
+    username: "{{ docker_hub_user }}"
+    password: "{{ vault_dockerhub_password }}"
+  when: registry_is_private | bool
+  no_log: true

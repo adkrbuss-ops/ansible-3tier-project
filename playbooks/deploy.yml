@@ -1,0 +1,13 @@
+---
+# Deploys the 3 tiers in order: DB -> App -> Web
+- name: Deploy DB tier
+  hosts: role_db
+  roles: [db]
+
+- name: Deploy App tier
+  hosts: role_app
+  roles: [app]
+
+- name: Deploy Web tier
+  hosts: role_web
+  roles: [web]

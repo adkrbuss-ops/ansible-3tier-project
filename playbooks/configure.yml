@@ -1,0 +1,8 @@
+---
+- name: Base + Docker on every server
+  hosts: all
+  roles: [common, docker]
+
+- name: Jenkins server
+  hosts: role_jenkins
+  roles: [jenkins]

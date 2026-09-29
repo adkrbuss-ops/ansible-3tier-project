@@ -1,0 +1,65 @@
+---
+- name: Install Java, Ansible and AWS libs
+  ansible.builtin.apt:
+    name: [openjdk-17-jre, ansible, python3-boto3, python3-botocore]
+    state: present
+
+- name: Add Jenkins apt key
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    dest: /usr/share/keyrings/jenkins-keyring.asc
+    mode: "0644"
+
+- name: Add Jenkins apt repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+    filename: jenkins
+    state: present
+
+- name: Install Jenkins
+  ansible.builtin.apt:
+    name: jenkins
+    state: present
+    update_cache: true
+
+- name: Let Jenkins use Docker
+  ansible.builtin.user:
+    name: jenkins
+    groups: docker
+    append: true
+  notify: Restart jenkins
+
+- name: Copy requirements.yml
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../requirements.yml"
+    dest: /tmp/requirements.yml
+    mode: "0644"
+
+- name: Install Ansible collections for the jenkins user
+  ansible.builtin.command: >
+    ansible-galaxy collection install -r /tmp/requirements.yml
+    -p /var/lib/jenkins/.ansible/collections
+  become_user: jenkins
+  changed_when: false
+
+- name: Enable and start Jenkins
+  ansible.builtin.service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Wait for initial admin password
+  ansible.builtin.wait_for:
+    path: /var/lib/jenkins/secrets/initialAdminPassword
+    timeout: 180
+
+- name: Read initial admin password
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_pw
+
+- name: Show Jenkins URL and password
+  ansible.builtin.debug:
+    msg:
+      - "Jenkins URL : http://{{ ansible_host }}:8080"
+      - "Admin password: {{ jenkins_pw.content | b64decode | trim }}"

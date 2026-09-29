@@ -1,0 +1,14 @@
+# Dynamic inventory: discovers running EC2 instances tagged Project=threetier
+# and groups them by their "Role" tag -> role_web, role_app, role_db, role_jenkins
+plugin: amazon.aws.aws_ec2
+regions:
+  - ap-south-1
+filters:
+  tag:Project: threetier
+  instance-state-name: running
+keyed_groups:
+  - key: tags.Role
+    prefix: role
+    separator: "_"
+compose:
+  ansible_host: public_ip_address

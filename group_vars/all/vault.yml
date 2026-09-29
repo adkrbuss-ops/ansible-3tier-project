@@ -1,0 +1,3 @@
+# Encrypt before committing:  ansible-vault encrypt group_vars/all/vault.yml
+vault_db_password: "ChangeMe_Strong_Password"
+vault_dockerhub_password: "your-dockerhub-token"
